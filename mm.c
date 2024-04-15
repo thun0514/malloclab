@@ -69,7 +69,7 @@ team_t team = {
 #define PREV_BLKP(bp) ((char *)(bp)-GET_SIZE(((char *)(bp)-DSIZE)))
 
 static char *last_bp;
-static char *heap_listp;
+
 void *mm_malloc(size_t size);
 void mm_free(void *bp);
 static void *coalesce(void *bp);
@@ -83,14 +83,17 @@ static void place(void *bp, size_t asize);
  */
 int mm_init(void)
 {
+    char * heap_listp;
     /* Create the initial empty heap */
     if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1)
         return -1;
 
-    PUT(heap_listp, 0);                            /* Alignment padding */
-    PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */
-    PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
-    PUT(heap_listp + (3 * WSIZE), PACK(0, 1));     /* Epilogue header */
+    PUT(heap_listp, 0);                             /* Alignment padding */
+    PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1));  /* Prologue header */
+    PUT(heap_listp + (3 * WSIZE), NULL);            /* Free memory block predecessor */
+    PUT(heap_listp + (4 * WSIZE), NULL);            /* Free memory block successor */
+    PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1));  /* Prologue footer */
+    PUT(heap_listp + (5 * WSIZE), PACK(0, 1));      /* Epilogue header */
     heap_listp += (2 * WSIZE);
 
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
@@ -162,26 +165,26 @@ static void *coalesce(void *bp)
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
 
-    if (prev_alloc && next_alloc)
-    { /* Case 1 */
+    if (prev_alloc && next_alloc) /* Case 1 */
+    {
         last_bp = bp;
         return bp;
     }
-    else if (prev_alloc && !next_alloc)
+    else if (prev_alloc && !next_alloc)/* Case 2 */
     {
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp))); /* Case 2 */
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
-    else if (!prev_alloc && next_alloc)
-    { /* Case 3 */
+    else if (!prev_alloc && next_alloc) /* Case 3 */
+    {
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-    else
-    { /* Case 4 */
+    else /* Case 4 */
+    {
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(FTRP(NEXT_BLKP(bp)));
 
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
@@ -237,7 +240,7 @@ static void *find_fit(size_t asize)
     /* Next-fit search */
     void *bp;
     if (last_bp == NULL)
-        last_bp = heap_listp;
+        last_bp = mem_heap_lo();
 
     for (bp = last_bp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
     {
