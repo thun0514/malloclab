@@ -69,7 +69,6 @@ team_t team = {
 #define PREV_BLKP(bp) ((char *)(bp)-GET_SIZE(((char *)(bp)-DSIZE)))
 
 static char *last_bp;
-static char *heap_listp;
 void *mm_malloc(size_t size);
 void mm_free(void *bp);
 static void *coalesce(void *bp);
@@ -83,6 +82,7 @@ static void place(void *bp, size_t asize);
  */
 int mm_init(void)
 {
+    char *heap_listp;
     /* Create the initial empty heap */
     if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1)
         return -1;
@@ -237,7 +237,7 @@ static void *find_fit(size_t asize)
     /* Next-fit search */
     void *bp;
     if (last_bp == NULL)
-        last_bp = heap_listp;
+        last_bp = mem_heap_lo();
 
     for (bp = last_bp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
     {
